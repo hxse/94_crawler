@@ -42,7 +42,7 @@ def download_m3u8(url, name):
     """
     import subprocess
 
-    command = f'ffmpeg -y -http_proxy {http_proxy} -i "{url}" -c copy {name}'
+    command = f'ffmpeg -y -nostdin -http_proxy {http_proxy} -i "{url}" -c copy {name}'
 
     res = subprocess.call(command, shell=True)
     # the method returns the exit code
