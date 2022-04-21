@@ -2,6 +2,7 @@
 # coding: utf-8
 from ast import parse
 import grequests
+from pydantic import FilePath
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
@@ -41,7 +42,7 @@ def download_m3u8(url, name):
     """
     import subprocess
 
-    command = f'ffmpeg -n -http_proxy {http_proxy} -i "{url}" -c copy {name}'
+    command = f'ffmpeg -y -http_proxy {http_proxy} -i "{url}" -c copy {name}'
 
     res = subprocess.call(command, shell=True)
     # the method returns the exit code
@@ -151,15 +152,27 @@ def get_page_one(url):
         return {"pageCount": pageCount, "data": data}
 
 
+def get_file(fileName, dirName):
+    fileName = validateName(f'{fileName}".mp4"', "")  # 把文件名净化成windows安全的字符
+    filePath = Path(dirName) / fileName
+    isSkip = False
+    if Path(filePath).exists():
+        size = Path(filePath).stat().st_size
+        if size > 0:
+            isSkip = True
+    return [filePath, isSkip]
+
+
 def download_video(url):
     """
     download video
     """
     info = get_m3u8([url])[0]
+    filePath, isSkip = get_file(info["videoTitle"], createDir(info["author"]))
+    if isSkip:
+        print("已存在,跳过:", info["videoTitle"], url, info["m3u8_url"])
+        return
     print("download:", info["videoTitle"], info["m3u8_url"])
-    fileName = validateName(f'{info["videoTitle"]}".mp4"', "")
-    filePath = createDir(info["author"]) / fileName
-    # 把文件名净化成windows安全的字符
     download_m3u8(info["m3u8_url"], filePath)  # 也可以用videoTitle
 
 
@@ -167,6 +180,7 @@ def download_user(url):
     """
     download all user videos
     """
+    url=url.split('?')[0]
     pageInfoArr = get_page(url)
     videoInfoArr = get_m3u8([get_domain(url) + i["url"] for i in pageInfoArr])
     for pageInfo, videoInfo in zip(pageInfoArr, videoInfoArr):
@@ -174,9 +188,11 @@ def download_user(url):
     # return pageInfoArr
 
     for info in pageInfoArr:
+        filePath, isSkip = get_file(info["title"], createDir(info["author"]))
+        if isSkip:
+            print("已存在,跳过:", info["title"], url, info["m3u8_url"])
+            continue
         print("download:", info["title"], info["m3u8_url"])
-        fileName = validateName(f'{info["title"]}".mp4"', "")
-        filePath = createDir(info["author"]) / fileName
         download_m3u8(info["m3u8_url"], filePath)  # 也可以用videoTitle
 
 
