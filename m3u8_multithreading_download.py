@@ -45,7 +45,7 @@ def getCachePath(cacheDirPath, url):
     return cacheDirPath / url.split("/")[-1]
 
 
-def m3u8_multithreading_download(url, fileName, cacheDirName="cache"):
+def m3u8_multithreading_download(url, fileName, cacheDirName="cache_files"):
     response = requests.get(url, headers=headers, proxies=proxies, timeout=timeout)
 
     if response.status_code != 200:
@@ -78,7 +78,7 @@ def m3u8_multithreading_download(url, fileName, cacheDirName="cache"):
 
 def ts_merge(tsFileArr, output):
     tsCmd = "|".join([str(i) for i in tsFileArr])
-    command = f'ffmpeg -y -nostdin -i "concat:{tsCmd}" -c copy {output}'
+    command = f'ffmpeg -y -nostdin -i "concat:{tsCmd}" -c copy "{output}"'
     subprocess.call(command, shell=True)
 
 

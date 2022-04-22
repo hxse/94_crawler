@@ -39,7 +39,7 @@ def download_m3u8(url, name):
     """
     import subprocess
 
-    command = f'ffmpeg -y -nostdin -http_proxy {http_proxy} -i "{url}" -c copy {name}'
+    command = f'ffmpeg -y -nostdin -http_proxy {http_proxy} -i "{url}" -c copy "{name}"'
 
     res = subprocess.call(command, shell=True)
     # the method returns the exit code
@@ -52,7 +52,7 @@ def parse_m3u8(text):
     titleEl = soup.select_one(".container-title")
     title = titleEl.text.strip()
     videoEl = soup.select_one("#video-play")
-    m3u8_url = videoEl["data-src"]
+    m3u8_url = videoEl["data-src"].strip()
 
     likeEl = soup.select_one(".likeBtn")
     like = likeEl.text.strip()
@@ -64,7 +64,7 @@ def parse_m3u8(text):
     tabEl = soup.select_one("#videoShowTabAbout")
     authorEl = tabEl.select("div div:nth-child(1)")[-1].select_one("a")
     author = authorEl.text.strip()
-    authorUrl = authorEl["href"]
+    authorUrl = authorEl["href"].strip()
     calendarEl = tabEl.select("div div:nth-child(2)")[0]
     calendar = calendarEl.text.strip()
     viewEl = tabEl.select("div div:nth-child(2)")[1]
@@ -135,39 +135,43 @@ def get_page_one(url):
         text = response.text
         soup = BeautifulSoup(text, "html.parser")
         videoElArr = soup.select(".colVideoList .video-elem")
-        data = [
-            {
-                "title": el.select_one(".title").text,
-                "url": el.select_one(".title")["href"],
-            }
-            for el in videoElArr
-        ]
+
         pageLinkArr = [
             i.text for i in soup.select(".page-link") if i.text not in filterArr
         ]
         pageCount = int(pageLinkArr[-1]) if pageLinkArr else 1
+        data = [
+            {
+                "title": el.select_one(".title").text.strip(),
+                "url": el.select_one(".title")["href"].strip(),
+                "author": el.select_one(".text-sub-title a").text.strip(),
+            }
+            for el in videoElArr
+        ]
         return {"pageCount": pageCount, "data": data}
+
+
+def get_file_path(author, title):
+    fileName = validateName(f'{title}".mp4"', "")  # 把文件名净化成windows安全的字符
+    filePath = Path(createDir(author)) / fileName
+    return filePath
 
 
 def download_video(url):
     """
     download video
     """
-    info = get_m3u8([url])[0]
+    info = get_m3u8_one(url)
 
-    fileName = validateName(f'{info["videoTitle"]}".mp4"', "")  # 把文件名净化成windows安全的字符
-    filePath = Path(createDir(info["author"])) / fileName
-    cachePath = Path(createDir(info["author"])) / "cache"
+    filePath = get_file_path(info["author"], info["videoTitle"])
     filePath, isSkip = is_file(filePath)
     if isSkip:
-        print("已存在,跳过:", info["videoTitle"], url, info["m3u8_url"])
+        print("已存在,跳过:",info["author"], info["title"], url,info["m3u8_url"])
         return
-    print("download:", info["videoTitle"], info["m3u8_url"])
+    print("start downloading:", info["videoTitle"], info["m3u8_url"])
 
     # download_m3u8(info["m3u8_url"], filePath)  #用ffmpeg直接下载
-    m3u8_multithreading_download(
-        info["m3u8_url"], filePath
-    )  # 多线程下载,再用ffmpeg合并
+    m3u8_multithreading_download(info["m3u8_url"], filePath)  # 多线程下载,再用ffmpeg合并
 
 
 def download_user(url):
@@ -176,25 +180,14 @@ def download_user(url):
     """
     url = url.split("?")[0]
     pageInfoArr = get_page(url)
-    videoInfoArr = get_m3u8([get_domain(url) + i["url"] for i in pageInfoArr])
-    for pageInfo, videoInfo in zip(pageInfoArr, videoInfoArr):
-        pageInfo.update(videoInfo)
-    # return pageInfoArr
-
     for info in pageInfoArr:
-        fileName = validateName(f'{info["title"]}".mp4"', "")  # 把文件名净化成windows安全的字符
-        filePath = Path(createDir(info["author"])) / fileName
+        filePath = get_file_path(info["author"], info["title"])
         filePath, isSkip = is_file(filePath)
         if isSkip:
-            print("已存在,跳过:", info["title"], url, info["m3u8_url"])
+            print("已存在,跳过:",info["author"], info["title"], url)
             continue
-        print("download:", info["title"], info["m3u8_url"])
-
-        # download_m3u8(info["m3u8_url"], filePath)  #用ffmpeg直接下载
-        m3u8_multithreading_download(
-            info["m3u8_url"], filePath
-        )  # 多线程下载,再用ffmpeg合并
-
+        download_video(get_domain(url) + info["url"])
+        continue
 
 def mix_download(url):
     urlObj = urlparse(url)
