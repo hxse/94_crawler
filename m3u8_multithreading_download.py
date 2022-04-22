@@ -90,11 +90,17 @@ def m3u8_multithreading_download(url, fileName, cacheDirName="cache_files", retr
     delete(tsFileArr, cacheDirPath)
 
 
+def trans_concat(name):
+    return name.replace("\\", "\\\\").replace("'", "\\'").replace(" ", "\\ ")
+
+
 def ts_merge(tsFileArr, output, cacheDirPath):
     concatFile = cacheDirPath / "concat.txt"
     with open(concatFile, "w", encoding="utf8") as f:
-        trans = lambda i: i.replace("'", "\\'").replace(" ", "\\ ")
-        f.writelines([f"file {trans(i)}\n" for i in tsFileArr])
+        f.writelines([f"file {trans_concat(str(i))}\n" for i in tsFileArr])
+    import pdb
+
+    pdb.set_trace()
     command = (
         f'ffmpeg -y -nostdin -f concat -safe 0 -i "{concatFile}"  -c copy "{output}"'
     )
