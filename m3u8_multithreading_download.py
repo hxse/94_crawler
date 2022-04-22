@@ -98,9 +98,6 @@ def ts_merge(tsFileArr, output, cacheDirPath):
     concatFile = cacheDirPath / "concat.txt"
     with open(concatFile, "w", encoding="utf8") as f:
         f.writelines([f"file {trans_concat(str(i))}\n" for i in tsFileArr])
-    import pdb
-
-    pdb.set_trace()
     command = (
         f'ffmpeg -y -nostdin -f concat -safe 0 -i "{concatFile}"  -c copy "{output}"'
     )
