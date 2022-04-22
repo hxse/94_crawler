@@ -180,7 +180,7 @@ def download_user(url):
     """
     url = url.split("?")[0]
     pageInfoArr = get_page(url)
-    for info in pageInfoArr:
+    for info in pageInfoArr: #onebyone 因为并发的话,服务器会有时间戳限制,过期就无法请求了
         filePath = get_file_path(info["author"], info["title"])
         filePath, isSkip = is_file(filePath)
         if isSkip:

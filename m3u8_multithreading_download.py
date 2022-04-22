@@ -68,10 +68,13 @@ def m3u8_multithreading_download(url, fileName, cacheDirName="cache_files"):
         grequests.get(tsUrl, headers=headers, proxies=proxies, timeout=timeout)
         for tsUrl in tsUrlArr
     )
-
+    count=len(tsUrlArr)
+    num=0
     for res in grequests.imap(reqs, size=size):
         with open(getCachePath(cacheDirPath, res.url), "wb") as f:
             f.write(res.content)
+        num+=1
+        print(f'{num}/{count} {getCachePath(cacheDirPath,res.url).name}')
     ts_merge(tsFileArr, fileName)
     delete(tsFileArr, cacheDirPath)
 
