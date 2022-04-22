@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # coding: utf-8
-from ast import parse
 import grequests
-from pydantic import FilePath
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
@@ -10,6 +8,11 @@ import fire
 from time import sleep
 from pathlib import Path
 import re
+from m3u8_multithreading_download import (
+    m3u8_multithreading_download,
+    createDir,
+    is_file,
+)
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.97 Safari/537.36",
@@ -28,12 +31,6 @@ def validateName(name, target=""):
     re_str = r"[\/\\\:\*\?\"\<\>\|]"  # '/ \ : * ? " < > |'
     new_name = re.sub(re_str, target, name)
     return new_name
-
-
-def createDir(path):
-    dirPath = Path(".") / path
-    dirPath.mkdir(parents=True, exist_ok=True)
-    return dirPath
 
 
 def download_m3u8(url, name):
@@ -152,35 +149,32 @@ def get_page_one(url):
         return {"pageCount": pageCount, "data": data}
 
 
-def get_file(fileName, dirName):
-    fileName = validateName(f'{fileName}".mp4"', "")  # 把文件名净化成windows安全的字符
-    filePath = Path(dirName) / fileName
-    isSkip = False
-    if Path(filePath).exists():
-        size = Path(filePath).stat().st_size
-        if size > 0:
-            isSkip = True
-    return [filePath, isSkip]
-
-
 def download_video(url):
     """
     download video
     """
     info = get_m3u8([url])[0]
-    filePath, isSkip = get_file(info["videoTitle"], createDir(info["author"]))
+
+    fileName = validateName(f'{info["videoTitle"]}".mp4"', "")  # 把文件名净化成windows安全的字符
+    filePath = Path(createDir(info["author"])) / fileName
+    cachePath = Path(createDir(info["author"])) / "cache"
+    filePath, isSkip = is_file(filePath)
     if isSkip:
         print("已存在,跳过:", info["videoTitle"], url, info["m3u8_url"])
         return
     print("download:", info["videoTitle"], info["m3u8_url"])
-    download_m3u8(info["m3u8_url"], filePath)  # 也可以用videoTitle
+
+    # download_m3u8(info["m3u8_url"], filePath)  #用ffmpeg直接下载
+    m3u8_multithreading_download(
+        info["m3u8_url"], filePath
+    )  # 多线程下载,再用ffmpeg合并
 
 
 def download_user(url):
     """
     download all user videos
     """
-    url=url.split('?')[0]
+    url = url.split("?")[0]
     pageInfoArr = get_page(url)
     videoInfoArr = get_m3u8([get_domain(url) + i["url"] for i in pageInfoArr])
     for pageInfo, videoInfo in zip(pageInfoArr, videoInfoArr):
@@ -188,12 +182,18 @@ def download_user(url):
     # return pageInfoArr
 
     for info in pageInfoArr:
-        filePath, isSkip = get_file(info["title"], createDir(info["author"]))
+        fileName = validateName(f'{info["title"]}".mp4"', "")  # 把文件名净化成windows安全的字符
+        filePath = Path(createDir(info["author"])) / fileName
+        filePath, isSkip = is_file(filePath)
         if isSkip:
             print("已存在,跳过:", info["title"], url, info["m3u8_url"])
             continue
         print("download:", info["title"], info["m3u8_url"])
-        download_m3u8(info["m3u8_url"], filePath)  # 也可以用videoTitle
+
+        # download_m3u8(info["m3u8_url"], filePath)  #用ffmpeg直接下载
+        m3u8_multithreading_download(
+            info["m3u8_url"], filePath
+        )  # 多线程下载,再用ffmpeg合并
 
 
 def mix_download(url):
@@ -218,5 +218,6 @@ if __name__ == "__main__":
             "dm": download_m3u8,
             "gp": get_page,
             "gpo": get_page_one,
+            "mmd": m3u8_multithreading_download,
         }
     )
