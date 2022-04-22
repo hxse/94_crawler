@@ -166,7 +166,7 @@ def download_video(url):
     filePath = get_file_path(info["author"], info["videoTitle"])
     filePath, isSkip = is_file(filePath)
     if isSkip:
-        print("已存在,跳过:", info["author"], info["title"], url, info["m3u8_url"])
+        print("已存在,跳过:", info["author"], info["videoTitle"], url, info["m3u8_url"])
         return
     print("start downloading:", info["videoTitle"], info["m3u8_url"])
 
