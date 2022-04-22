@@ -17,8 +17,9 @@ proxies = {
     "https": http_proxy,
 }
 
-timeout = 60
-size = 10
+timeout = 30
+size = 20
+retryMax = 3
 
 
 def createDir(path):
@@ -45,7 +46,7 @@ def getCachePath(cacheDirPath, url):
     return cacheDirPath / url.split("/")[-1]
 
 
-def m3u8_multithreading_download(url, fileName, cacheDirName="cache_files"):
+def m3u8_multithreading_download(url, fileName, cacheDirName="cache_files", retry=0):
     response = requests.get(url, headers=headers, proxies=proxies, timeout=timeout)
 
     if response.status_code != 200:
@@ -54,9 +55,9 @@ def m3u8_multithreading_download(url, fileName, cacheDirName="cache_files"):
 
     urlParent = url.split("?")[0].rsplit("/", 1)[0]
     tsNameArr = getTsList(response.text)
-    tsUrlArrFull = [urlParent + "/" + i for i in tsNameArr]
     cacheDirPath = createDir(f"{cacheDirName}/{fileName}")
     tsFileArr = [(cacheDirPath / i) for i in tsNameArr]
+    tsUrlArrFull = [urlParent + "/" + i for i in tsNameArr]
 
     tsUrlArr = [  # 已下载的话则去重
         tsUrl
@@ -75,6 +76,16 @@ def m3u8_multithreading_download(url, fileName, cacheDirName="cache_files"):
             f.write(res.content)
         num += 1
         print(f"{num}/{count} {getCachePath(cacheDirPath,res.url).name}")
+
+    if num != count:
+        if retry < retryMax:  # 重试次数
+            retry += 1
+            print("开始重试:", "次数", retry, "最大次数", retryMax)
+            return m3u8_multithreading_download(url, fileName, cacheDirName, retry)
+        else:
+            print("retry,超过最大次数,建议放弃", f"{num}/{count}", fileName)
+            return
+
     ts_merge(tsFileArr, fileName)
     delete(tsFileArr, cacheDirPath)
 
