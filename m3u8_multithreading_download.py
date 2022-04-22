@@ -68,13 +68,13 @@ def m3u8_multithreading_download(url, fileName, cacheDirName="cache_files"):
         grequests.get(tsUrl, headers=headers, proxies=proxies, timeout=timeout)
         for tsUrl in tsUrlArr
     )
-    count=len(tsUrlArr)
-    num=0
+    count = len(tsUrlArr)
+    num = 0
     for res in grequests.imap(reqs, size=size):
         with open(getCachePath(cacheDirPath, res.url), "wb") as f:
             f.write(res.content)
-        num+=1
-        print(f'{num}/{count} {getCachePath(cacheDirPath,res.url).name}')
+        num += 1
+        print(f"{num}/{count} {getCachePath(cacheDirPath,res.url).name}")
     ts_merge(tsFileArr, fileName)
     delete(tsFileArr, cacheDirPath)
 
@@ -94,7 +94,7 @@ def delete(tsFileArr, cacheDirPath=False):
             try:
                 i.rmdir()
             except OSError as e:
-                print('无法删除:',i,e)
+                print("无法删除:", i, e)
 
 
 if __name__ == "__main__":

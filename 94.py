@@ -166,7 +166,7 @@ def download_video(url):
     filePath = get_file_path(info["author"], info["videoTitle"])
     filePath, isSkip = is_file(filePath)
     if isSkip:
-        print("已存在,跳过:",info["author"], info["title"], url,info["m3u8_url"])
+        print("已存在,跳过:", info["author"], info["title"], url, info["m3u8_url"])
         return
     print("start downloading:", info["videoTitle"], info["m3u8_url"])
 
@@ -180,14 +180,16 @@ def download_user(url):
     """
     url = url.split("?")[0]
     pageInfoArr = get_page(url)
-    for info in pageInfoArr: #onebyone 因为并发的话,服务器会有时间戳限制,过期就无法请求了
+    for idx, info in enumerate(pageInfoArr):  # onebyone 因为并发的话,服务器会有时间戳限制,过期就无法请求了
         filePath = get_file_path(info["author"], info["title"])
         filePath, isSkip = is_file(filePath)
         if isSkip:
-            print("已存在,跳过:",info["author"], info["title"], url)
+            print("已存在,跳过:", info["author"], info["title"], url)
             continue
+        print(f"{idx+1}/{len(pageInfoArr)}")
         download_video(get_domain(url) + info["url"])
         continue
+
 
 def mix_download(url):
     urlObj = urlparse(url)
