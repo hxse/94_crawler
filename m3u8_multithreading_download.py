@@ -86,14 +86,20 @@ def m3u8_multithreading_download(url, fileName, cacheDirName="cache_files", retr
             print("retry,超过最大次数,建议放弃", f"{num}/{count}", fileName)
             return
 
-    ts_merge(tsFileArr, fileName)
+    ts_merge(tsFileArr, fileName, cacheDirPath)
     delete(tsFileArr, cacheDirPath)
 
 
-def ts_merge(tsFileArr, output):
-    tsCmd = "|".join([str(i) for i in tsFileArr])
-    command = f'ffmpeg -y -nostdin -i "concat:{tsCmd}" -c copy "{output}"'
+def ts_merge(tsFileArr, output, cacheDirPath):
+    concatFile = cacheDirPath / "concat.txt"
+    with open(concatFile, "w", encoding="utf8") as f:
+        trans = lambda i: i.replace("'", "\\'").replace(" ", "\\ ")
+        f.writelines([f"file {trans(i)}\n" for i in tsFileArr])
+    command = (
+        f'ffmpeg -y -nostdin -f concat -safe 0 -i "{concatFile}"  -c copy "{output}"'
+    )
     subprocess.call(command, shell=True)
+    concatFile.unlink()  # 清除concat文件
 
 
 def delete(tsFileArr, cacheDirPath=False):
