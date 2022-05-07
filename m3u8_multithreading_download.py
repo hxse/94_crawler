@@ -81,7 +81,7 @@ def m3u8_multithreading_download(url, cacheDirPath, filePath, retry=0):
         if retry < retryMax:  # 重试次数
             retry += 1
             print("开始重试:", "次数", retry, "最大次数", retryMax)
-            return m3u8_multithreading_download(url, cacheDirPath, retry)
+            return m3u8_multithreading_download(url, cacheDirPath,filePath, retry)
         else:
             print("retry,超过最大次数,建议放弃", f"{num}/{count}", cacheDirPath)
             return
@@ -96,11 +96,7 @@ def trans_concat(name):
 
 def ts_merge(tsFileArr, cacheDirPath, output):
     concatFile = cacheDirPath / "concat.txt"
-    try:
-        createDir(output.parent)
-    except AttributeError as e:
-        print(e)
-        import pdb; pdb.set_trace()
+    createDir(output.parent)
 
     with open(concatFile, "w", encoding="utf8") as f:
         f.writelines([f"file {trans_concat(str(i))}\n" for i in tsFileArr])
