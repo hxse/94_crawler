@@ -18,7 +18,7 @@ proxies = {
 }
 
 timeout = 20
-size = 20
+size = 25
 retryMax = 3
 
 
