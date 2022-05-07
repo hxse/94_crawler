@@ -107,7 +107,7 @@ def get_domain(url):
     return f"{urlparse(url).scheme}://{urlparse(url).hostname}"
 
 
-def get_page(url, sec=0):
+def get_page(url, maxNum=24 * 2, sec=0):
     """
     get all page video
     example url: https://jiuse88.com/author/91%E6%8E%A2%E8%8A%B1%E5%B0%8F%E6%BB%A1
@@ -118,11 +118,13 @@ def get_page(url, sec=0):
     dataArr.extend(firstPage["data"])
     if firstPage["pageCount"] > 1:  # 获取后续page
         for num in range(2, firstPage["pageCount"] + 1):
+            if len(dataArr) >= maxNum:
+                return dataArr[0:maxNum]
             sleep(sec)
             print(f"page {num} sleep {sec} ...")
             otherPage = get_page_one(url + f"?page={num}")
             dataArr.extend(otherPage["data"])
-    return dataArr
+    return dataArr[0:maxNum]
 
 
 def get_page_one(url):
@@ -163,41 +165,127 @@ def download_video(url):
     """
     info = get_m3u8_one(url)
 
-    filePath = get_file_path(info["author"], info["videoTitle"])
+    filePath = get_file_path(
+        info["author"], info["videoTitle"]
+    )  # 一定要用videoTitle,别用page里的title,因为会添加前缀后缀
     filePath, isSkip = is_file(filePath)
     if isSkip:
-        print("已存在,跳过:", info["author"], info["videoTitle"], url, info["m3u8_url"])
-        return
-    print("start downloading:", info["videoTitle"], info["m3u8_url"])
+        print(
+            "check video info - 已存在,跳过:",
+            info["author"],
+            info["videoTitle"],
+            url,
+            info["m3u8_url"],
+        )
+        return filePath
+    print("start downloading:",info["author"], info["videoTitle"], info["m3u8_url"])
 
     # download_m3u8(info["m3u8_url"], filePath)  #用ffmpeg直接下载
     m3u8_multithreading_download(info["m3u8_url"], filePath)  # 多线程下载,再用ffmpeg合并
+    return filePath
 
 
-def download_user(url):
+def create_playlist(paths, category):
+    if not category:
+        return
+    filePath = Path(f"{category}.m3u8")
+    data = []
+    if filePath.is_file():
+        with open(filePath, "r", encoding="utf8") as f:
+            data = f.readlines()
+    m3u8Title = "#EXTM3U8\n"
+    if len(data) > 0:
+        data = data[1:] if data[0] == m3u8Title else data
+    for p in paths:
+        p = p.as_posix() + "\n"
+        if p not in data:
+            data.append(p)
+    data = [i.strip() + "\n" for i in data if i.strip()]
+    with open(filePath, "w", encoding="utf8") as f:
+        f.write(m3u8Title)
+        f.writelines(data)
+
+
+def cleanTitleArr(title):
+    startText = "[原创] "
+    startTitle = title[len(startText) :] if title.startswith(startText) else title
+    endText = " 已更新"
+    endTitle = (
+        startTitle[: -len(endText)] if startTitle.endswith(endText) else startTitle
+    )
+    blankTitle = "".join([i for i in endTitle if i.strip()])
+    return [title.strip(), endTitle.strip(), blankTitle.strip()]
+
+
+def check_skip(info, titleArr):
+    """
+    因为page页面title会有很多前缀后缀,所以要过滤,不过进入视频页面后title就干净了,uses页面也是干净的
+    这种前缀很杂乱,只能过滤大部分,剩下的去video页面过滤
+    """
+    for title in titleArr:
+        filePath = get_file_path(info["author"], title)
+        filePath, isSkip = is_file(filePath)
+        if isSkip:
+            return [filePath, True]
+    return [filePath, False]
+
+
+def download_user(url, maxNum, category=""):
     """
     download all user videos
     """
     url = url.split("?")[0]
-    pageInfoArr = get_page(url)
+    pageInfoArr = get_page(url, maxNum)
+    print("start videos:", len(pageInfoArr))
+    filePathArr = []
     for idx, info in enumerate(pageInfoArr):  # onebyone 因为并发的话,服务器会有时间戳限制,过期就无法请求了
-        filePath = get_file_path(info["author"], info["title"])
-        filePath, isSkip = is_file(filePath)
+        titleArr = (
+            cleanTitleArr(info["title"]) if category else [info["title"].strip()]
+        )  # 过滤一下标题
+        [filePath, isSkip] = check_skip(info, titleArr)
         if isSkip:
-            print("已存在,跳过:", info["author"], info["title"], url)
+            print("check page info - 已存在,跳过:", filePath, url)
+            filePathArr.append(filePath)
             continue
         print(f"{idx+1}/{len(pageInfoArr)}")
-        download_video(get_domain(url) + info["url"])
-        continue
+        filePath = download_video(get_domain(url) + info["url"])
+        filePathArr.append(filePath)
+
+    create_playlist(filePathArr, category)
 
 
-def mix_download(url):
+def download_category(url, maxNum):
+    """
+    download category
+    url example:
+    https://jiuse88.com/video/category/recent-favorite
+    https://jiuse88.com/video/category/hot-list
+    https://jiuse88.com/video/category/ori
+    https://jiuse88.com/video/category/month-discuss
+    https://jiuse88.com/video/category/top-favorite
+    https://jiuse88.com/video/category/most-favorite
+    https://jiuse88.com/video/category/top-list
+    https://jiuse88.com/video/category/top-last
+    """
+    uSplit = url.split("category")
+    category = uSplit[1].split("/")[1]
+    url = uSplit[0] + "category" + "/" + category
+    download_user(url, maxNum, category)
+
+
+def mix_download(url, maxNum=24 * 1):
+    """
+    url: https://jiuse88.com/author/Nectarina%E6%B0%B4%E8%9C%9C%E6%A1%83
+    max: max videos number
+    """
     urlObj = urlparse(url)
-    name = urlObj.path.split("/")[1]
-    if name == "video":
+    seg = urlObj.path.split("/")
+    if seg[2] == "category":
+        download_category(url, maxNum)
+    elif seg[1] == "video":
         download_video(url)
-    elif name == "author":
-        download_user(url)
+    elif seg[1] == "author":
+        download_user(url, maxNum)
     else:
         print("网页路径不匹配", url)
 
@@ -207,8 +295,9 @@ if __name__ == "__main__":
     fire.Fire(
         {
             "md": mix_download,
-            "du": download_user,  # download all video from user page
             "dv": download_video,  # dwonload one video from video page
+            "du": download_user,  # download all video from user page
+            "dc": download_category,  # download all video from category
             "gm": get_m3u8,
             "dm": download_m3u8,
             "gp": get_page,

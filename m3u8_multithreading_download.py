@@ -17,7 +17,7 @@ proxies = {
     "https": http_proxy,
 }
 
-timeout = 30
+timeout = 20
 size = 20
 retryMax = 3
 
