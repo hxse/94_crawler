@@ -178,7 +178,7 @@ def download_video(url):
             info["m3u8_url"],
         )
         return filePath
-    print("start downloading:",info["author"], info["videoTitle"], info["m3u8_url"])
+    print("start downloading:", info["author"], info["videoTitle"], info["m3u8_url"])
 
     # download_m3u8(info["m3u8_url"], filePath)  #用ffmpeg直接下载
     m3u8_multithreading_download(info["m3u8_url"], filePath)  # 多线程下载,再用ffmpeg合并
@@ -213,8 +213,8 @@ def cleanTitleArr(title):
     endTitle = (
         startTitle[: -len(endText)] if startTitle.endswith(endText) else startTitle
     )
-    blankTitle = "".join([i for i in endTitle if i.strip()])
-    return [title.strip(), endTitle.strip(), blankTitle.strip()]
+    cleanBlank = lambda title: "".join([i for i in title if i.strip()])
+    return [cleanBlank(title), cleanBlank(startTitle), cleanBlank(endTitle)]
 
 
 def check_skip(info, titleArr):
@@ -273,7 +273,7 @@ def download_category(url, maxNum):
     download_user(url, maxNum, category)
 
 
-def mix_download(url, maxNum=24 * 1):
+def mix_download(url, maxNum=24 * 2):
     """
     url: https://jiuse88.com/author/Nectarina%E6%B0%B4%E8%9C%9C%E6%A1%83
     max: max videos number
