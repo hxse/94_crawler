@@ -232,14 +232,10 @@ def cleanTitleArr(title):
         for endText in endArr
         for startTitle in startTitleArr
     ]
-    # if title.startswith("[原创] 高三露脸小可爱"):
-    #     import pdb
-
-    #     pdb.set_trace()
-    replaceArr = ["（主页已更新）"]
+    replaceArr = [["（主页已更新）", ""]]
     replaceTitleArr = [
-        startTitle.replace(replaceText, "", 1)
-        for replaceText in replaceArr
+        startTitle.replace(key, value, 1)
+        for key, value in replaceArr
         for startTitle in startTitleArr
     ]
     return [
