@@ -163,9 +163,11 @@ def get_cache_dir(path, cacheDir="cache_files"):
     return Path(cacheDir) / path.parent.name / path.stem
 
 
-def download_video(url):
+def download_video(url, lastTitle=""):
     """
     download video
+    url: https://jiuse88.com/video/view/2138052877
+    lastTitle: 这个参数是当分类页面和视频页面标题不一致的时候,用来打印区别的,不影响运行逻辑
     """
     info = get_m3u8_one(url)
 
@@ -181,6 +183,8 @@ def download_video(url):
             url,
             info["m3u8_url"],
         )
+        if info["videoTitle"] != lastTitle:
+            print("标题不一致:", lastTitle)
         return filePath
     print("start downloading:", info["author"], info["videoTitle"], info["m3u8_url"])
 
@@ -212,15 +216,38 @@ def create_playlist(paths, category):
         f.writelines(data)
 
 
+def cleanBlank(title):
+    return "".join([i for i in title if i.strip()])
+
+
 def cleanTitleArr(title):
-    startText = "[原创] "
-    startTitle = title[len(startText) :] if title.startswith(startText) else title
-    endText = " 已更新"
-    endTitle = (
+    startArr = ["[原创] "]
+    startTitleArr = [
+        title[len(startText) :] if title.startswith(startText) else title
+        for startText in startArr
+    ]
+    endArr = [" 已更新", "(有完整版)"]
+    endTitleArr = [
         startTitle[: -len(endText)] if startTitle.endswith(endText) else startTitle
-    )
-    cleanBlank = lambda title: "".join([i for i in title if i.strip()])
-    return [cleanBlank(title), cleanBlank(startTitle), cleanBlank(endTitle)]
+        for endText in endArr
+        for startTitle in startTitleArr
+    ]
+    # if title.startswith("[原创] 高三露脸小可爱"):
+    #     import pdb
+
+    #     pdb.set_trace()
+    replaceArr = ["（主页已更新）"]
+    replaceTitleArr = [
+        startTitle.replace(replaceText, "", 1)
+        for replaceText in replaceArr
+        for startTitle in startTitleArr
+    ]
+    return [
+        cleanBlank(title),
+        *[cleanBlank(i) for i in startTitleArr],
+        *[cleanBlank(i) for i in endTitleArr],
+        *[cleanBlank(i) for i in replaceTitleArr],
+    ]
 
 
 def check_skip(info, titleArr):
@@ -254,7 +281,7 @@ def download_user(url, maxNum, category=""):
             filePathArr.append(filePath)
             continue
         print(f"{idx+1}/{len(pageInfoArr)}")
-        filePath = download_video(get_domain(url) + info["url"])
+        filePath = download_video(get_domain(url) + info["url"], info["title"])
         filePathArr.append(filePath)
 
     create_playlist(filePathArr, category)
