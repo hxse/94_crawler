@@ -46,7 +46,7 @@ def getCachePath(cacheDirPath, url):
     return cacheDirPath / url.split("/")[-1]
 
 
-def m3u8_multithreading_download(url, fileName, cacheDirName="cache_files", retry=0):
+def m3u8_multithreading_download(url, cacheDirPath, filePath, retry=0):
     response = requests.get(url, headers=headers, proxies=proxies, timeout=timeout)
 
     if response.status_code != 200:
@@ -55,7 +55,7 @@ def m3u8_multithreading_download(url, fileName, cacheDirName="cache_files", retr
 
     urlParent = url.split("?")[0].rsplit("/", 1)[0]
     tsNameArr = getTsList(response.text)
-    cacheDirPath = createDir(f"{cacheDirName}/{fileName}")
+    createDir(cacheDirPath)
     tsFileArr = [(cacheDirPath / i) for i in tsNameArr]
     tsUrlArrFull = [urlParent + "/" + i for i in tsNameArr]
 
@@ -81,12 +81,12 @@ def m3u8_multithreading_download(url, fileName, cacheDirName="cache_files", retr
         if retry < retryMax:  # 重试次数
             retry += 1
             print("开始重试:", "次数", retry, "最大次数", retryMax)
-            return m3u8_multithreading_download(url, fileName, cacheDirName, retry)
+            return m3u8_multithreading_download(url, cacheDirPath, retry)
         else:
-            print("retry,超过最大次数,建议放弃", f"{num}/{count}", fileName)
+            print("retry,超过最大次数,建议放弃", f"{num}/{count}", cacheDirPath)
             return
 
-    ts_merge(tsFileArr, fileName, cacheDirPath)
+    ts_merge(tsFileArr, cacheDirPath, filePath)
     delete(tsFileArr, cacheDirPath)
 
 
@@ -94,8 +94,14 @@ def trans_concat(name):
     return name.replace("\\", "\\\\").replace("'", "\\'").replace(" ", "\\ ")
 
 
-def ts_merge(tsFileArr, output, cacheDirPath):
+def ts_merge(tsFileArr, cacheDirPath, output):
     concatFile = cacheDirPath / "concat.txt"
+    try:
+        createDir(output.parent)
+    except AttributeError as e:
+        print(e)
+        import pdb; pdb.set_trace()
+
     with open(concatFile, "w", encoding="utf8") as f:
         f.writelines([f"file {trans_concat(str(i))}\n" for i in tsFileArr])
     command = (

@@ -10,7 +10,6 @@ from pathlib import Path
 import re
 from m3u8_multithreading_download import (
     m3u8_multithreading_download,
-    createDir,
     is_file,
 )
 
@@ -153,10 +152,15 @@ def get_page_one(url):
         return {"pageCount": pageCount, "data": data}
 
 
-def get_file_path(author, title):
+def get_file_path(author, title, dataDir="data_files"):
     fileName = validateName(f'{title}".mp4"', "")  # 把文件名净化成windows安全的字符
-    filePath = Path(createDir(author)) / fileName
+    filePath = Path(dataDir) / author / fileName
     return filePath
+
+
+def get_cache_dir(path, cacheDir="cache_files"):
+    """path arg from get_file_path function"""
+    return Path(cacheDir) / path.parent.name / path.stem
 
 
 def download_video(url):
@@ -181,7 +185,9 @@ def download_video(url):
     print("start downloading:", info["author"], info["videoTitle"], info["m3u8_url"])
 
     # download_m3u8(info["m3u8_url"], filePath)  #用ffmpeg直接下载
-    m3u8_multithreading_download(info["m3u8_url"], filePath)  # 多线程下载,再用ffmpeg合并
+    m3u8_multithreading_download(
+        info["m3u8_url"], get_cache_dir(filePath), filePath
+    )  # 多线程下载,再用ffmpeg合并
     return filePath
 
 
@@ -276,7 +282,7 @@ def download_category(url, maxNum):
 def mix_download(url, maxNum=24 * 2):
     """
     url: https://jiuse88.com/author/Nectarina%E6%B0%B4%E8%9C%9C%E6%A1%83
-    max: max videos number
+    max: max videos number, user页面和category页面需要填(忽略则使用默认值),如果是单个video页面就不用填了,填了也忽略
     """
     urlObj = urlparse(url)
     seg = urlObj.path.split("/")
