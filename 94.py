@@ -8,6 +8,7 @@ import fire
 from time import sleep
 from pathlib import Path
 import re
+import json
 from m3u8_multithreading_download import (
     m3u8_multithreading_download,
     is_file,
@@ -24,6 +25,10 @@ proxies = {
 
 timeout = 60
 size = 6
+
+
+with open("./config.json", "r", encoding="utf-8") as file:
+    config = json.load(file)
 
 
 def validateName(name, target=""):
@@ -280,13 +285,34 @@ def check_skip_glob(info, filePath):
     return [filePath, False]
 
 
+def blacklist_filter(pageInfoArrOrigin):
+    pageInfoArr = []
+    blacklistArr = []
+    ifAuthor = lambda info: info["author"] in config["blacklist"]["author"]
+    ifVideoId = lambda info: info["videoId"] in config["blacklist"]["videoId"]
+    for info in pageInfoArrOrigin:
+        if ifAuthor(info) or ifVideoId(info):
+            blacklistArr.append(info)
+        else:
+            pageInfoArr.append(info)
+    return [pageInfoArr, blacklistArr]
+
+
 def download_user(url, maxNum, category=""):
     """
     download all user videos
     """
     url = url.split("?")[0]
-    pageInfoArr = get_page(url, maxNum)
-    print("start videos:", len(pageInfoArr))
+    pageInfoArrOrigin = get_page(url, maxNum)
+    [pageInfoArr, blacklistArr] = blacklist_filter(pageInfoArrOrigin)
+    print(
+        "start videos:",
+        len(pageInfoArr),
+        "blacklist videos:",
+        len(blacklistArr),
+        "count videos:",
+        len(pageInfoArrOrigin),
+    )
     filePathArr = []
     for idx, info in enumerate(pageInfoArr):  # onebyone 因为并发的话,服务器会有时间戳限制,过期就无法请求了
         videoUrl = get_domain(url) + info["url"]
