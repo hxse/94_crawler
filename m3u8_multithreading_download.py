@@ -18,8 +18,8 @@ proxies = {
 }
 
 timeout = 20
-size = 25
-retryMax = 3
+size = 15
+retryMax = 4
 
 
 def createDir(path):
@@ -64,26 +64,52 @@ def m3u8_multithreading_download(url, cacheDirPath, filePath, retry=0):
         for tsUrl in tsUrlArrFull
         if not is_file(getCachePath(cacheDirPath, tsUrl))[1]
     ]
-    print("ts缓存已跳过", len(tsUrlArrFull) - len(tsUrlArr), "剩余", len(tsUrlArr))
+    print(
+        "ts缓存已跳过: ",
+        len(tsUrlArrFull) - len(tsUrlArr),
+        "剩余: ",
+        len(tsUrlArr),
+        "总计: ",
+        len(tsUrlArrFull),
+    )
     reqs = (
         grequests.get(tsUrl, headers=headers, proxies=proxies, timeout=timeout)
         for tsUrl in tsUrlArr
     )
     count = len(tsUrlArr)
     num = 0
+    success = 0
     for res in grequests.imap(reqs, size=size):
-        with open(getCachePath(cacheDirPath, res.url), "wb") as f:
-            f.write(res.content)
         num += 1
-        print(f"{num}/{count} {getCachePath(cacheDirPath,res.url).name}")
+        if res.status_code == 200:
+            success += 1
+            with open(getCachePath(cacheDirPath, res.url), "wb") as f:
+                f.write(res.content)
+            print(
+                f"{num}/{count}",
+                "请求成功:",
+                res.status_code,
+                getCachePath(cacheDirPath, res.url).name,
+            )
+        else:
+            print(
+                f"{num}/{count}",
+                "请求失败:",
+                res.status_code,
+                getCachePath(cacheDirPath, res.url).name,
+            )
 
-    if num != count:
+    if success != count:
         if retry < retryMax:  # 重试次数
             retry += 1
             print("开始重试:", "次数", retry, "最大次数", retryMax)
-            return m3u8_multithreading_download(url, cacheDirPath,filePath, retry)
+            return m3u8_multithreading_download(url, cacheDirPath, filePath, retry)
         else:
-            print("retry,超过最大次数,建议放弃", f"{num}/{count}", cacheDirPath)
+            print(
+                "retry,超过最大次数,建议放弃",
+                f"剩余: {len(tsUrlArr)} 总数: {len(tsUrlArrFull)}",
+                cacheDirPath,
+            )
             return
 
     ts_merge(tsFileArr, cacheDirPath, filePath)
@@ -98,7 +124,7 @@ def ts_merge(tsFileArr, cacheDirPath, output):
     concatFile = cacheDirPath / "concat.txt"
     createDir(output.parent)
 
-    with open(concatFile, "w", encoding="utf8") as f:
+    with open(concatFile, "w", encoding="utf-8") as f:
         f.writelines([f"file {trans_concat(str(i))}\n" for i in tsFileArr])
     command = (
         f'ffmpeg -y -nostdin -f concat -safe 0 -i "{concatFile}"  -c copy "{output}"'

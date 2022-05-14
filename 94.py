@@ -46,7 +46,7 @@ def download_m3u8(url, name):
     # print("Returned Value: ", res)
 
 
-def parse_m3u8(text):
+def parse_m3u8(text, url):
     soup = BeautifulSoup(text, "html.parser")
     titleEl = soup.select_one(".container-title")
     title = titleEl.text.strip()
@@ -69,6 +69,7 @@ def parse_m3u8(text):
     viewEl = tabEl.select("div div:nth-child(2)")[1]
     view = viewEl.text.strip()
     return {
+        "videoId": url.split("?")[0].split("/")[-1],
         "videoTitle": title,
         "m3u8_url": m3u8_url,
         "like": like,
@@ -90,7 +91,7 @@ def get_m3u8(urlArr):
         for url in urlArr
     )
     resArr = grequests.map(reqs, size=size)
-    return [parse_m3u8(response.text) for response in resArr]
+    return [parse_m3u8(response.text, response.url) for response in resArr]
 
 
 def get_m3u8_one(url):
@@ -99,7 +100,7 @@ def get_m3u8_one(url):
     """
     response = requests.get(url, headers=headers, proxies=proxies, timeout=timeout)
     if response.status_code == 200:
-        return parse_m3u8(response.text)
+        return parse_m3u8(response.text, url)
 
 
 def get_domain(url):
@@ -143,6 +144,7 @@ def get_page_one(url):
         pageCount = int(pageLinkArr[-1]) if pageLinkArr else 1
         data = [
             {
+                "videoId": el.select_one(".title")["href"].strip().split("/")[-1],
                 "title": el.select_one(".title").text.strip(),
                 "url": el.select_one(".title")["href"].strip(),
                 "author": el.select_one(".text-sub-title a").text.strip(),
@@ -152,9 +154,9 @@ def get_page_one(url):
         return {"pageCount": pageCount, "data": data}
 
 
-def get_file_path(author, title, dataDir="data_files"):
+def get_file_path(author, title, vid, dataDir="data_files"):
     title = title.rstrip(".")  # windows会把末尾的.清空
-    fileName = validateName(f'{title}".mp4"', "")  # 把文件名净化成windows安全的字符
+    fileName = validateName(f"{title}_{vid}.mp4", "")  # 把文件名净化成windows安全的字符
     filePath = Path(dataDir) / author / fileName
     return filePath
 
@@ -171,14 +173,13 @@ def download_video(url, lastTitle=""):
     lastTitle: 这个参数是当分类页面和视频页面标题不一致的时候,用来打印区别的,不影响运行逻辑
     """
     info = get_m3u8_one(url)
-
     filePath = get_file_path(
-        info["author"], info["videoTitle"]
+        info["author"], info["videoTitle"], info["videoId"]
     )  # 一定要用videoTitle,别用page里的title,因为会添加前缀后缀
     filePath, isSkip = is_file(filePath)
     if isSkip:
         print(
-            "check video info - 已存在,跳过:",
+            "check video title - 已存在,跳过:",
             info["author"],
             info["videoTitle"],
             url,
@@ -186,6 +187,32 @@ def download_video(url, lastTitle=""):
         )
         print("标题一致?", info["videoTitle"] == lastTitle)
         return filePath
+
+    [filePathGlob, isSkipGlob] = check_skip_glob(info, filePath)
+    if isSkipGlob:
+        print(
+            "check video id - 已存在,跳过:",
+            info["author"],
+            info["videoTitle"],
+            url,
+            info["m3u8_url"],
+        )
+        print("标题一致?", info["videoTitle"] == lastTitle)
+        return filePathGlob
+
+    # for filePathGlob in Path(filePath.parent).glob(f'*_{info["videoId"]}.mp4'):
+    #     filePathGlob, isSkip = is_file(filePathGlob)
+    #     if isSkip:
+    #         print(
+    #             "check video id - 已存在,跳过:",
+    #             info["author"],
+    #             info["videoTitle"],
+    #             url,
+    #             info["m3u8_url"],
+    #         )
+    #         print("标题一致?", info["videoTitle"] == lastTitle)
+    #         return filePathGlob
+
     # print("start downloading:", info["author"], info["videoTitle"], info["m3u8_url"])
 
     # download_m3u8(info["m3u8_url"], filePath)  #用ffmpeg直接下载
@@ -239,10 +266,10 @@ def cleanTitleArr(title):
         for startTitle in startTitleArr
     ]
     return [
-        cleanBlank(title),
         *[cleanBlank(i) for i in startTitleArr],
         *[cleanBlank(i) for i in endTitleArr],
         *[cleanBlank(i) for i in replaceTitleArr],
+        cleanBlank(title),  # 最后一项放原标题,便于check_skip函数返回
     ]
 
 
@@ -250,12 +277,21 @@ def check_skip(info, titleArr):
     """
     因为page页面title会有很多前缀后缀,所以要过滤,不过进入视频页面后title就干净了,uses页面也是干净的
     这种前缀很杂乱,只能过滤大部分,剩下的去video页面过滤
+    titleArr最后一项放原标题,不跳过则直接返回
     """
     for title in titleArr:
-        filePath = get_file_path(info["author"], title)
+        filePath = get_file_path(info["author"], title, info["videoId"])
         filePath, isSkip = is_file(filePath)
         if isSkip:
             return [filePath, True]
+    return [filePath, False]
+
+
+def check_skip_glob(info, filePath):
+    for filePathGlob in Path(filePath.parent).glob(f'*_{info["videoId"]}.mp4'):
+        filePathGlob, isSkip = is_file(filePathGlob)
+        if isSkip:
+            return [filePathGlob, True]
     return [filePath, False]
 
 
@@ -268,19 +304,28 @@ def download_user(url, maxNum, category=""):
     print("start videos:", len(pageInfoArr))
     filePathArr = []
     for idx, info in enumerate(pageInfoArr):  # onebyone 因为并发的话,服务器会有时间戳限制,过期就无法请求了
+        videoUrl = get_domain(url) + info["url"]
         print("\n")
-        print(f"start: {idx+1}/{len(pageInfoArr)}", info["title"], info["url"])
+        print(f"start: {idx+1}/{len(pageInfoArr)}", info["title"], videoUrl)
+
         titleArr = (
             cleanTitleArr(info["title"]) if category else [info["title"].strip()]
         )  # 过滤一下标题
         [filePath, isSkip] = check_skip(info, titleArr)
         if isSkip:
-            print("check page info - 已存在,跳过:", filePath, url)
+            print("check page title - 已存在,跳过:", filePath, videoUrl)
             filePathArr.append(filePath)
             continue
-        filePath = download_video(get_domain(url) + info["url"], info["title"])
+
+        [filePathGlob, isSkipGlob] = check_skip_glob(info, filePath)
+        if isSkipGlob:
+            print("check page id - 已存在,跳过:", filePath, videoUrl)
+            filePathArr.append(filePathGlob)
+            continue
+
+        filePath = download_video(videoUrl, info["title"])
         filePathArr.append(filePath)
-        print(f"end: {idx+1}/{len(pageInfoArr)}", info["title"], info["url"])
+        print(f"end: {idx+1}/{len(pageInfoArr)}", info["title"], videoUrl)
         print("\n")
 
     create_playlist(filePathArr, category)
