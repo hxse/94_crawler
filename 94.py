@@ -200,21 +200,6 @@ def download_video(url, lastTitle=""):
         print("标题一致?", info["videoTitle"] == lastTitle)
         return filePathGlob
 
-    # for filePathGlob in Path(filePath.parent).glob(f'*_{info["videoId"]}.mp4'):
-    #     filePathGlob, isSkip = is_file(filePathGlob)
-    #     if isSkip:
-    #         print(
-    #             "check video id - 已存在,跳过:",
-    #             info["author"],
-    #             info["videoTitle"],
-    #             url,
-    #             info["m3u8_url"],
-    #         )
-    #         print("标题一致?", info["videoTitle"] == lastTitle)
-    #         return filePathGlob
-
-    # print("start downloading:", info["author"], info["videoTitle"], info["m3u8_url"])
-
     # download_m3u8(info["m3u8_url"], filePath)  #用ffmpeg直接下载
     m3u8_multithreading_download(
         info["m3u8_url"], get_cache_dir(filePath), filePath
@@ -306,7 +291,12 @@ def download_user(url, maxNum, category=""):
     for idx, info in enumerate(pageInfoArr):  # onebyone 因为并发的话,服务器会有时间戳限制,过期就无法请求了
         videoUrl = get_domain(url) + info["url"]
         print("\n")
-        print(f"start: {idx+1}/{len(pageInfoArr)}", info["title"], videoUrl)
+        print(
+            f"start: {idx+1}/{len(pageInfoArr)}",
+            info["author"],
+            info["title"],
+            videoUrl,
+        )
 
         titleArr = (
             cleanTitleArr(info["title"]) if category else [info["title"].strip()]
@@ -325,7 +315,9 @@ def download_user(url, maxNum, category=""):
 
         filePath = download_video(videoUrl, info["title"])
         filePathArr.append(filePath)
-        print(f"end: {idx+1}/{len(pageInfoArr)}", info["title"], videoUrl)
+        print(
+            f"end: {idx+1}/{len(pageInfoArr)}", info["author"], info["title"], videoUrl
+        )
         print("\n")
 
     create_playlist(filePathArr, category)
