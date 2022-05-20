@@ -17,9 +17,9 @@ proxies = {
     "https": http_proxy,
 }
 
-timeout = 20
-size = 15
-retryMax = 4
+timeout = 30
+size = 6
+retryMax = 5
 
 
 def createDir(path):
@@ -125,7 +125,8 @@ def ts_merge(tsFileArr, cacheDirPath, output):
     createDir(output.parent)
 
     with open(concatFile, "w", encoding="utf-8") as f:
-        f.writelines([f"file {trans_concat(str(i))}\n" for i in tsFileArr])
+        # f.writelines([f"file .\\{trans_concat(str(i))}\n" for i in tsFileArr])
+        f.writelines([f"file {str(i.name)}\n" for i in tsFileArr])
     command = (
         f'ffmpeg -y -nostdin -f concat -safe 0 -i "{concatFile}"  -c copy "{output}"'
     )
