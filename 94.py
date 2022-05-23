@@ -212,6 +212,27 @@ def download_video(url, lastTitle=""):
     return filePath
 
 
+# def sort_playlist(data, paths):
+#     for p in paths:
+#         p = p.as_posix() + "\n"
+#         if p not in data:
+#             data.append(p)
+#     return data
+
+
+def sort_playlist(data, paths):
+    cursor = -1
+    for p in paths:
+        p = p.as_posix() + "\n"
+        if p in data:
+            cursor = data.index(p)
+        else:
+            data.insert(cursor + 1, p)
+            cursor = data.index(p)
+
+    return data
+
+
 def create_playlist(paths, category):
     if not category:
         return
@@ -223,10 +244,7 @@ def create_playlist(paths, category):
     m3u8Title = "#EXTM3U8\n"
     if len(data) > 0:
         data = data[1:] if data[0] == m3u8Title else data
-    for p in paths:
-        p = p.as_posix() + "\n"
-        if p not in data:
-            data.append(p)
+    data = sort_playlist(data, paths)
     data = [i.strip() + "\n" for i in data if i.strip()]
     with open(filePath, "w", encoding="utf8") as f:
         f.write(m3u8Title)
