@@ -46,13 +46,22 @@ def getCachePath(cacheDirPath, url):
     return cacheDirPath / url.split("/")[-1]
 
 
-def m3u8_multithreading_download(url, cacheDirPath, filePath, retry=0):
-    response = requests.get(url, headers=headers, proxies=proxies, timeout=timeout)
+def get_url(url, retry=1, tag=""):
+    assert retry <= retryMax, f"{tag} 超过最大重试次数:{retryMax}"
+    try:
+        response = requests.get(url, headers=headers, proxies=proxies, timeout=timeout)
+        if response.status_code == 200:
+            return response
+        raise Exception(f"{tag} 服务器返回了 {response.status_code}")
+    except Exception as e:
+        retry += 1
+        print(f"{tag} 报错内容: {e}")
+        print(f"{tag} 重试次数:{retry} 最大次数:{retryMax}")
+        return get_url(url, retry)
 
-    if response.status_code != 200:
-        print("请求失败:", response.status_code, url)
-        return
 
+def m3u8_download(url, cacheDirPath, filePath, retry=0):
+    response = get_url(url, tag="get_m3u8_file")
     urlParent = url.split("?")[0].rsplit("/", 1)[0]
     tsNameArr = getTsList(response.text)
     createDir(cacheDirPath)
@@ -102,11 +111,11 @@ def m3u8_multithreading_download(url, cacheDirPath, filePath, retry=0):
     if success != count:
         if retry < retryMax:  # 重试次数
             retry += 1
-            print("开始重试:", "次数", retry, "最大次数", retryMax)
-            return m3u8_multithreading_download(url, cacheDirPath, filePath, retry)
+            print(f"m3u8_download 重试次数:{retry} 最大次数:{retryMax}")
+            return m3u8_download(url, cacheDirPath, filePath, retry)
         else:
             print(
-                "retry,超过最大次数,建议放弃",
+                f"m3u8_download 超过最大重试次数:{retryMax}",
                 f"剩余: {len(tsUrlArr)} 总数: {len(tsUrlArrFull)}",
                 cacheDirPath,
             )
@@ -148,4 +157,4 @@ def delete(tsFileArr, cacheDirPath=False):
 
 if __name__ == "__main__":
     url = "https://cdnt.jiuse.cloud/hls/629658/index.m3u8?t=1650619324&m=N7llU_Ps2K8GmxSyX4Bm6Q"
-    fire.Fire(m3u8_multithreading_download)
+    fire.Fire(m3u8_download)

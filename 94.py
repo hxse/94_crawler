@@ -10,7 +10,8 @@ from pathlib import Path
 import re
 import json
 from m3u8_multithreading_download import (
-    m3u8_multithreading_download,
+    m3u8_download,
+    get_url,
     is_file,
 )
 
@@ -25,7 +26,7 @@ proxies = {
 
 timeout = 60
 size = 6
-
+retryMax = 5
 
 with open("./config.json", "r", encoding="utf-8") as file:
     config = json.load(file)
@@ -37,7 +38,7 @@ def validateName(name, target=""):
     return new_name
 
 
-def download_m3u8(url, name):
+def ffmpeg_download_m3u8(url, name):
     """
     download m3u8 url
     """
@@ -97,15 +98,6 @@ def get_m3u8(urlArr):
     )
     resArr = grequests.map(reqs, size=size)
     return [parse_m3u8(response.text, response.url) for response in resArr]
-
-
-def get_m3u8_one(url):
-    """
-    get m3u8 url
-    """
-    response = requests.get(url, headers=headers, proxies=proxies, timeout=timeout)
-    if response.status_code == 200:
-        return parse_m3u8(response.text, url)
 
 
 def get_domain(url):
@@ -177,7 +169,8 @@ def download_video(url, lastTitle=""):
     url: https://jiuse88.com/video/view/2138052877
     lastTitle: 这个参数是当分类页面和视频页面标题不一致的时候,用来打印区别的,不影响运行逻辑
     """
-    info = get_m3u8_one(url)
+    response = get_url(url, tag="get_m3u8_url_one")
+    info = parse_m3u8(response.text, url)
     filePath = get_file_path(
         info["author"], info["videoTitle"], info["videoId"]
     )  # 一定要用videoTitle,别用page里的title,因为会添加前缀后缀
@@ -205,8 +198,8 @@ def download_video(url, lastTitle=""):
         print("标题一致?", info["videoTitle"] == lastTitle)
         return filePathGlob
 
-    # download_m3u8(info["m3u8_url"], filePath)  #用ffmpeg直接下载
-    m3u8_multithreading_download(
+    # ffmpeg_download_m3u8(info["m3u8_url"], filePath)  #用ffmpeg直接下载
+    m3u8_download(
         info["m3u8_url"], get_cache_dir(filePath), filePath
     )  # 多线程下载,再用ffmpeg合并
     return filePath
@@ -412,9 +405,9 @@ if __name__ == "__main__":
             "du": download_user,  # download all video from user page
             "dc": download_category,  # download all video from category
             "gm": get_m3u8,
-            "dm": download_m3u8,
             "gp": get_page,
             "gpo": get_page_one,
-            "mmd": m3u8_multithreading_download,
+            "fdm": ffmpeg_download_m3u8,
+            "mdl": m3u8_download,
         }
     )
