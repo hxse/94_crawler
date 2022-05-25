@@ -60,14 +60,7 @@ def get_url(url, retry=1, tag=""):
         return get_url(url, retry)
 
 
-def m3u8_download(url, cacheDirPath, filePath, retry=0):
-    response = get_url(url, tag="get_m3u8_file")
-    urlParent = url.split("?")[0].rsplit("/", 1)[0]
-    tsNameArr = getTsList(response.text)
-    createDir(cacheDirPath)
-    tsFileArr = [(cacheDirPath / i) for i in tsNameArr]
-    tsUrlArrFull = [urlParent + "/" + i for i in tsNameArr]
-
+def imap_loop(tsUrlArrFull, cacheDirPath, filePath, retry=1):
     tsUrlArr = [  # 已下载的话则去重
         tsUrl
         for tsUrl in tsUrlArrFull
@@ -109,17 +102,26 @@ def m3u8_download(url, cacheDirPath, filePath, retry=0):
             )
 
     if success != count:
-        if retry < retryMax:  # 重试次数
-            retry += 1
-            print(f"m3u8_download 重试次数:{retry} 最大次数:{retryMax}")
-            return m3u8_download(url, cacheDirPath, filePath, retry)
-        else:
-            print(
-                f"m3u8_download 超过最大重试次数:{retryMax}",
-                f"剩余: {len(tsUrlArr)} 总数: {len(tsUrlArrFull)}",
-                cacheDirPath,
-            )
-            return
+        assert (
+            retry <= retryMax
+        ), f"""m3u8_download 超过最大重试次数:{retryMax}
+            剩余: {len(tsUrlArr)} 总数: {len(tsUrlArrFull)}
+            {cacheDirPath}
+            """
+        retry += 1
+        print(f"m3u8_download 重试次数:{retry} 最大次数:{retryMax}")
+        return imap_loop(tsUrlArrFull, cacheDirPath, filePath, retry)
+
+
+def m3u8_download(url, cacheDirPath, filePath):
+    response = get_url(url, tag="get_m3u8_file")
+    urlParent = url.split("?")[0].rsplit("/", 1)[0]
+    tsNameArr = getTsList(response.text)
+    createDir(cacheDirPath)
+    tsFileArr = [(cacheDirPath / i) for i in tsNameArr]
+    tsUrlArrFull = [urlParent + "/" + i for i in tsNameArr]
+
+    imap_loop(tsUrlArrFull, cacheDirPath, filePath)
 
     ts_merge(tsFileArr, cacheDirPath, filePath)
     delete(tsFileArr, cacheDirPath)
