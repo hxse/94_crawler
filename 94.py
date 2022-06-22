@@ -28,9 +28,6 @@ timeout = 60
 size = 6
 retryMax = 5
 
-with open("./config.json", "r", encoding="utf-8") as file:
-    config = json.load(file)
-
 
 def validateName(name, target=""):
     re_str = r"[\/\\\:\*\?\"\<\>\|]"  # '/ \ : * ? " < > |'
@@ -155,12 +152,12 @@ def get_file_path(author, title, vid, dataDir="data_files"):
     title = title.rstrip(".")  # windows会把末尾的.清空
     fileName = validateName(f"{title}_{vid}.mp4", "")  # 把文件名净化成windows安全的字符
     filePath = Path(dataDir) / author / fileName
-    return filePath
+    return config["outPath"] / filePath
 
 
 def get_cache_dir(path, cacheDir="cache_files"):
     """path arg from get_file_path function"""
-    return Path(cacheDir) / path.parent.name / path.stem
+    return config["outPath"] / Path(cacheDir) / path.parent.name / path.stem
 
 
 def download_video(url, lastTitle=""):
@@ -200,8 +197,17 @@ def download_video(url, lastTitle=""):
 
     # ffmpeg_download_m3u8(info["m3u8_url"], filePath)  #用ffmpeg直接下载
     m3u8_download(
-        info["m3u8_url"], get_cache_dir(filePath), filePath
+        info["m3u8_url"],
+        get_cache_dir(filePath),
+        filePath,
     )  # 多线程下载,再用ffmpeg合并
+
+    return filePath
+
+
+def download_video_create_playlist(url, lastTitle=""):
+    filePath = download_video(url, lastTitle=lastTitle)
+    create_playlist([filePath], "videos")
     return filePath
 
 
@@ -229,7 +235,10 @@ def sort_playlist(data, paths):
 def create_playlist(paths, category):
     if not category:
         return
-    filePath = Path(f"{category}.m3u8")
+    if "/" in category:
+        (config["outPath"] / category.split("/")[0]).mkdir(exist_ok=True)
+
+    filePath = config["outPath"] / f"{category}.m3u8"
     data = []
     if filePath.is_file():
         with open(filePath, "r", encoding="utf8") as f:
@@ -238,7 +247,9 @@ def create_playlist(paths, category):
     if len(data) > 0:
         data = data[1:] if data[0] == m3u8Title else data
     data = sort_playlist(data, paths)
-    data = [i.strip() + "\n" for i in data if i.strip()]
+    data = [
+        Path("/".join(paths[0].parts[-3:])).as_posix() + "\n" for i in data if i.strip()
+    ]
     with open(filePath, "w", encoding="utf8") as f:
         f.write(m3u8Title)
         f.writelines(data)
@@ -274,7 +285,10 @@ def cleanTitleArr(title):
     ]
 
 
-def check_skip(info, titleArr):
+def check_skip(
+    info,
+    titleArr,
+):
     """
     因为page页面title会有很多前缀后缀,所以要过滤,不过进入视频页面后title就干净了,uses页面也是干净的
     这种前缀很杂乱,只能过滤大部分,剩下的去video页面过滤
@@ -357,6 +371,8 @@ def download_user(url, maxNum, category=""):
         )
         print("\n")
 
+    if category == "":
+        category = "user_playlist/" + info["author"]
     create_playlist(filePathArr, category)
 
 
@@ -376,20 +392,40 @@ def download_category(url, maxNum):
     uSplit = url.split("category")
     category = uSplit[1].split("/")[1]
     url = uSplit[0] + "category" + "/" + category
-    download_user(url, maxNum, category)
+    download_user(url, maxNum, category)  # 因为user和category的页面结构一样, 所以复用代码
 
 
-def mix_download(url, maxNum=24 * 2):
+def getConfig(configPath, outPath="./"):
+    if not configPath.is_file() or configPath.stat().st_size == 0:
+        with open(configPath, "w", encoding="utf-8") as file:
+            json.dump(
+                {"blacklist": {"videoId": [], "author": []}},
+                file,
+                ensure_ascii=False,
+                indent=4,
+            )
+    with open(configPath, "r", encoding="utf-8") as file:
+        config = json.load(file)
+        if "outPath" not in config or not config["outPath"]:
+            config["outPath"] = Path(outPath)
+        return config
+
+
+def mix_download(url, maxNum=24 * 2, outPath="./"):
     """
     url: https://jiuse88.com/author/Nectarina%E6%B0%B4%E8%9C%9C%E6%A1%83
     max: max videos number, user页面和category页面需要填(忽略则使用默认值),如果是单个video页面就不用填了,填了也忽略
     """
+    global config
+    configPath = Path(outPath) / "config.json"
+    config = getConfig(configPath, outPath=outPath)
+
     urlObj = urlparse(url)
     seg = urlObj.path.split("/")
     if seg[2] == "category":
         download_category(url, maxNum)
     elif seg[1] == "video":
-        download_video(url)
+        download_video_create_playlist(url)
     elif seg[1] == "author":
         download_user(url, maxNum)
     else:
@@ -401,7 +437,7 @@ if __name__ == "__main__":
     fire.Fire(
         {
             "md": mix_download,
-            "dv": download_video,  # dwonload one video from video page
+            "dv": download_video_create_playlist,  # dwonload one video from video page
             "du": download_user,  # download all video from user page
             "dc": download_category,  # download all video from category
             "gm": get_m3u8,
