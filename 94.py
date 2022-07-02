@@ -219,10 +219,17 @@ def download_video_create_playlist(url, lastTitle=""):
 #     return data
 
 
+def deduplication(data):
+    newData = []
+    for i in data:
+        if i not in newData:
+            newData.append(i)
+    return newData
+
+
 def sort_playlist(data, paths):
     cursor = -1
     for p in paths:
-        p = p.as_posix() + "\n"
         if p in data:
             cursor = data.index(p)
         else:
@@ -237,7 +244,6 @@ def create_playlist(paths, category):
         return
     if "/" in category:
         (config["outPath"] / category.split("/")[0]).mkdir(exist_ok=True)
-
     filePath = config["outPath"] / f"{category}.m3u8"
     data = []
     if filePath.is_file():
@@ -246,10 +252,13 @@ def create_playlist(paths, category):
     m3u8Title = "#EXTM3U8\n"
     if len(data) > 0:
         data = data[1:] if data[0] == m3u8Title else data
+    data = [i.strip() for i in data]
+    data = deduplication(data)
+    paths = [(Path("/".join(i.parts[-3:])).as_posix()).strip() for i in paths]
+    paths = deduplication(paths)  # 要是重复的话,sort会追加到第一个的后面去
     data = sort_playlist(data, paths)
-    data = [
-        Path("/".join(paths[0].parts[-3:])).as_posix() + "\n" for i in data if i.strip()
-    ]
+    data = deduplication(data)
+    data = [i + "\n" for i in data]
     with open(filePath, "w", encoding="utf8") as f:
         f.write(m3u8Title)
         f.writelines(data)
