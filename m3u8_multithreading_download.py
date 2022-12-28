@@ -138,9 +138,8 @@ def ts_merge(tsFileArr, cacheDirPath, output):
     with open(concatFile, "w", encoding="utf-8") as f:
         # f.writelines([f"file .\\{trans_concat(str(i))}\n" for i in tsFileArr])
         f.writelines([f"file {str(i.name)}\n" for i in tsFileArr])
-    command = (
-        f'ffmpeg -y -nostdin -f concat -safe 0 -i "{concatFile}"  -c copy "{output}"'
-    )
+    command = f'ffmpeg -y -nostdin -f concat -safe 0 -i "{concatFile.as_posix()}"  -c copy "{output.as_posix()}"'  # 这里不用as_posix()ffmpeg中文会显示乱码,可能是\\转义符的原因
+    subprocess.call("chcp 65001", shell=True)  # 这里不用65001ffmpeg中文会显示乱码,不过不影响结果,可以正常运行
     subprocess.call(command, shell=True)
     concatFile.unlink()  # 清除concat文件
 
