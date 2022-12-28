@@ -19,7 +19,7 @@ proxies = {
 
 timeout = 30
 size = 6
-retryMax = 5
+retryMax = 6
 
 
 def createDir(path):
