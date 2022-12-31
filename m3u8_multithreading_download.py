@@ -19,7 +19,7 @@ proxies = {
 
 timeout = 30
 size = 6
-retryMax = 6
+retryMax = 10
 
 
 def createDir(path):
@@ -154,6 +154,8 @@ def delete(tsFileArr, cacheDirPath=False):
                 i.rmdir()
             except OSError as e:
                 print("无法删除:", i, e)
+            if i.name=='cache_files':
+                break
 
 
 if __name__ == "__main__":
