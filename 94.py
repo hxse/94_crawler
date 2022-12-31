@@ -226,8 +226,15 @@ def deduplication(data):
             newData.append(i)
     return newData
 
+def add_playlist(data,paths):
+    return [*data,*paths]
 
 def sort_playlist(data, paths):
+    # 计算一下总数
+    all_data =add_playlist(data,paths)
+    all_data=deduplication(all_data)
+    print('start playlist',len(data),len(all_data))
+    # end
     cursor = -1
     for p in paths:
         if p in data:
@@ -235,7 +242,12 @@ def sort_playlist(data, paths):
         else:
             data.insert(cursor + 1, p)
             cursor = data.index(p)
-
+    print('end playlist  ',len(data),len(all_data))
+    # 根据总数判断一下,playlist合并的数量对不对
+    if len(all_data)!=len(data):
+        print(len(data),len(all_data))
+        import pdb; pdb.set_trace()
+    # end
     return data
 
 
