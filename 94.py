@@ -275,9 +275,10 @@ def create_playlist(paths, category):
     data = sort_playlist(data, paths)
     data = deduplication(data)
     data = [i + "\n" for i in data]
-
     with open(filePath, "w", encoding="utf8") as f:
         f.write(m3u8Title)
+        prefix = "/".join([".." for i in range(len(category.split("/")) - 1)])
+        data = [i if prefix == "" else prefix + "/" + i for i in data]
         f.writelines(data)
 
 
