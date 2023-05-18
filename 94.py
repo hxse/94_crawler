@@ -278,7 +278,11 @@ def create_playlist(paths, category):
     with open(filePath, "w", encoding="utf8") as f:
         f.write(m3u8Title)
         prefix = "/".join([".." for i in range(len(category.split("/")) - 1)])
-        data = [i if prefix == "" else prefix + "/" + i for i in data]
+        data = [
+            i if prefix == "" or i.startswith(prefix) else prefix + "/" + i
+            for i in data
+        ]
+        data = deduplication(data)
         f.writelines(data)
 
 
