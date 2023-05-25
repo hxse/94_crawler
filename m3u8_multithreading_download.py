@@ -57,6 +57,9 @@ def get_url(url, retry=1, tag=""):
         retry += 1
         print(f"{tag} 报错内容: {e}")
         print(f"{tag} 重试次数:{retry} 最大次数:{retryMax}")
+        if str(e).split(" ")[-1] == "403":
+            print(f"****已跳过,服务器返回403,可能是版权问题**** {url}")
+            return
         return get_url(url, retry)
 
 
@@ -154,7 +157,7 @@ def delete(tsFileArr, cacheDirPath=False):
                 i.rmdir()
             except OSError as e:
                 print("无法删除:", i, e)
-            if i.name=='cache_files':
+            if i.name == "cache_files":
                 break
 
 

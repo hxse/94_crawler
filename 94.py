@@ -167,6 +167,8 @@ def download_video(url, lastTitle=""):
     lastTitle: 这个参数是当分类页面和视频页面标题不一致的时候,用来打印区别的,不影响运行逻辑
     """
     response = get_url(url, tag="get_m3u8_url_one")
+    if not response:
+        return ""
     info = parse_m3u8(response.text, url)
     filePath = get_file_path(
         info["author"], info["videoTitle"], info["videoId"]
@@ -270,7 +272,11 @@ def create_playlist(paths, category):
         data = data[1:] if data[0] == m3u8Title else data
     data = [i.strip() for i in data]
     data = deduplication(data)
-    paths = [(Path("/".join(i.parts[-3:])).as_posix()).strip() for i in paths]
+    paths = [
+        (Path("/".join(i.parts[-3:])).as_posix()).strip()
+        for i in paths
+        if i.strip() != ""
+    ]
     paths = deduplication(paths)  # 要是重复的话,sort会追加到第一个的后面去
     data = sort_playlist(data, paths)
     data = deduplication(data)
