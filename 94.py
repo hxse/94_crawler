@@ -273,9 +273,7 @@ def create_playlist(paths, category):
     data = [i.strip() for i in data]
     data = deduplication(data)
     paths = [
-        (Path("/".join(i.parts[-3:])).as_posix()).strip()
-        for i in paths
-        if i.strip() != ""
+        (Path("/".join(i.parts[-3:])).as_posix()).strip() for i in paths if i != ""
     ]
     paths = deduplication(paths)  # 要是重复的话,sort会追加到第一个的后面去
     data = sort_playlist(data, paths)
