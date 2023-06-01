@@ -90,6 +90,11 @@ def imap_loop(tsUrlArrFull, cacheDirPath, filePath, retry=1):
             success += 1
             with open(getCachePath(cacheDirPath, res.url), "wb") as f:
                 f.write(res.content)
+                if len(res.content) == 0:
+                    print("警告,下载到空文件,可能是服务器问题,稍后再试", filePath, res.url)
+                    import pdb
+
+                    pdb.set_trace()
             print(
                 f"{num}/{count}",
                 "请求成功:",
