@@ -228,7 +228,7 @@ def add_playlist(data, paths):
 def sort_playlist(data, paths, mode=1):
     if mode == 1:
         for p in paths:
-            p = p.as_posix() + "\n"
+            p = Path(p).as_posix() + "\n"
             if p not in data:
                 data.append(p)
         return data
