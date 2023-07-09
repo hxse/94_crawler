@@ -213,14 +213,6 @@ def download_video_create_playlist(url, lastTitle=""):
     return filePath
 
 
-# def sort_playlist(data, paths):
-#     for p in paths:
-#         p = p.as_posix() + "\n"
-#         if p not in data:
-#             data.append(p)
-#     return data
-
-
 def deduplication(data):
     newData = []
     for i in data:
@@ -233,28 +225,35 @@ def add_playlist(data, paths):
     return [*data, *paths]
 
 
-def sort_playlist(data, paths):
-    # 计算一下总数
-    all_data = add_playlist(data, paths)
-    all_data = deduplication(all_data)
-    print("start playlist", len(data), len(all_data))
-    # end
-    cursor = -1
-    for p in paths:
-        if p in data:
-            cursor = data.index(p)
-        else:
-            data.insert(cursor + 1, p)
-            cursor = data.index(p)
-    print("end playlist  ", len(data), len(all_data))
-    # 根据总数判断一下,playlist合并的数量对不对
-    if len(all_data) != len(data):
-        print(len(data), len(all_data))
-        import pdb
+def sort_playlist(data, paths, mode=1):
+    if mode == 1:
+        for p in paths:
+            p = p.as_posix() + "\n"
+            if p not in data:
+                data.append(p)
+        return data
+    else:
+        # 计算一下总数
+        all_data = add_playlist(data, paths)
+        all_data = deduplication(all_data)
+        print("start playlist", len(data), len(all_data))
+        # end
+        cursor = -1
+        for p in paths:
+            if p in data:
+                cursor = data.index(p)
+            else:
+                data.insert(cursor + 1, p)
+                cursor = data.index(p)
+        print("end playlist  ", len(data), len(all_data))
+        # 根据总数判断一下,playlist合并的数量对不对
+        if len(all_data) != len(data):
+            print(len(data), len(all_data))
+            import pdb
 
-        pdb.set_trace()
-    # end
-    return data
+            pdb.set_trace()
+        # end
+        return data
 
 
 def create_playlist(paths, category):
