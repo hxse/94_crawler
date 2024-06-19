@@ -141,7 +141,7 @@ def get_page_one(url):
                 "videoId": el.select_one(".title")["href"].strip().split("/")[-1],
                 "title": el.select_one(".title").text.strip(),
                 "url": el.select_one(".title")["href"].strip(),
-                "author": el.select_one(".text-sub-title a").text.strip(),
+                "author": el.select_one("a.text-sub-title").text.strip(),
             }
             for el in videoElArr
         ]
@@ -373,7 +373,9 @@ def download_user(url, maxNum, category=""):
         len(pageInfoArrOrigin),
     )
     filePathArr = []
-    for idx, info in enumerate(pageInfoArr):  # onebyone 因为并发的话,服务器会有时间戳限制,过期就无法请求了
+    for idx, info in enumerate(
+        pageInfoArr
+    ):  # onebyone 因为并发的话,服务器会有时间戳限制,过期就无法请求了
         videoUrl = get_domain(url) + info["url"]
         print("\n")
         print(
@@ -426,7 +428,9 @@ def download_category(url, maxNum):
     uSplit = url.split("category")
     category = uSplit[1].split("/")[1]
     url = uSplit[0] + "category" + "/" + category
-    download_user(url, maxNum, category)  # 因为user和category的页面结构一样, 所以复用代码
+    download_user(
+        url, maxNum, category
+    )  # 因为user和category的页面结构一样, 所以复用代码
 
 
 def getConfig(configPath, outPath="./"):
