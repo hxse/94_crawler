@@ -155,6 +155,10 @@ def get_file_path(author, title, vid, dataDir="data_files"):
     return config["outPath"] / filePath
 
 
+def get_new_file_path(filePath, info):
+    return filePath.parent / f"{info['calendar']} {filePath.name}"
+
+
 def get_cache_dir(path, cacheDir="cache_files"):
     """path arg from get_file_path function"""
     return config["outPath"] / Path(cacheDir) / path.parent.name / path.stem
@@ -173,10 +177,19 @@ def download_video(url, lastTitle=""):
     filePath = get_file_path(
         info["author"], info["videoTitle"], info["videoId"]
     )  # 一定要用videoTitle,别用page里的title,因为会添加前缀后缀
+
+    NewFilePath = get_new_file_path(filePath, info)
     filePath, isSkip = is_file(filePath)
+    NewFilePath, NewIsSkip = is_file(NewFilePath)
+
+    if isSkip and not NewIsSkip:
+        print(f"change name {NewFilePath}")
+        filePath.rename(NewFilePath)
+        return NewFilePath
+
     if isSkip:
         print(
-            "check video title - 已存在,跳过:",
+            "skip video title1:",
             info["author"],
             info["videoTitle"],
             url,
@@ -185,10 +198,21 @@ def download_video(url, lastTitle=""):
         print("标题一致?", info["videoTitle"] == lastTitle)
         return filePath
 
+    if NewIsSkip:
+        print(
+            "skip video title2:",
+            info["author"],
+            info["videoTitle"],
+            url,
+            info["m3u8_url"],
+        )
+        print("标题一致?", info["videoTitle"] == lastTitle)
+        return NewFilePath
+
     [filePathGlob, isSkipGlob] = check_skip_glob(info, filePath)
     if isSkipGlob:
         print(
-            "check video id - 已存在,跳过:",
+            "skip video id:",
             info["author"],
             info["videoTitle"],
             url,
@@ -200,11 +224,11 @@ def download_video(url, lastTitle=""):
     # ffmpeg_download_m3u8(info["m3u8_url"], filePath)  #用ffmpeg直接下载
     m3u8_download(
         info["m3u8_url"],
-        get_cache_dir(filePath),
-        filePath,
+        get_cache_dir(NewFilePath),
+        NewFilePath,
     )  # 多线程下载,再用ffmpeg合并
 
-    return filePath
+    return NewFilePath
 
 
 def download_video_create_playlist(url, lastTitle=""):
