@@ -141,7 +141,7 @@ def get_page_one(url):
                 "videoId": el.select_one(".title")["href"].strip().split("/")[-1],
                 "title": el.select_one(".title").text.strip(),
                 "url": el.select_one(".title")["href"].strip(),
-                "author": el.select_one("a.text-sub-title").text.strip(),
+                "author": el.select_one("a.text-dark").text.strip(),
             }
             for el in videoElArr
         ]
