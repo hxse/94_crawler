@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 import fire
 from time import sleep
+import datetime
 from pathlib import Path
 import re
 import json
@@ -27,6 +28,13 @@ proxies = {
 timeout = 60
 size = 6
 retryMax = 5
+
+
+def replace_url(url, domain="91porny.com"):
+    url = url.split("?")[0]
+    url_arr = url.split("/")
+    url_arr[2] = domain
+    return "/".join(url_arr)
 
 
 def validateName(name, target=""):
@@ -101,7 +109,7 @@ def get_domain(url):
     return f"{urlparse(url).scheme}://{urlparse(url).hostname}"
 
 
-def get_page(url, maxNum=24 * 2, sec=0):
+def get_page(url, maxNum=24 * 2, sec=1.5):
     """
     get all page video
     example url: https://jiuse88.com/author/91%E6%8E%A2%E8%8A%B1%E5%B0%8F%E6%BB%A1
@@ -111,37 +119,76 @@ def get_page(url, maxNum=24 * 2, sec=0):
     firstPage = get_page_one(url + "?page=1")  # 初次获取page
     dataArr.extend(firstPage["data"])
     if firstPage["pageCount"] > 1:  # 获取后续page
+        print(f"get pageCount: {firstPage['pageCount']}")
         for num in range(2, firstPage["pageCount"] + 1):
             if len(dataArr) >= maxNum:
                 return dataArr[0:maxNum]
             sleep(sec)
             print(f"page {num} sleep {sec} ...")
-            otherPage = get_page_one(url + f"?page={num}")
-            dataArr.extend(otherPage["data"])
+
+            def _():
+                for i in range(3):
+                    pageUrl = url + f"?page={num}"
+                    otherPage = get_page_one(pageUrl)
+                    if not otherPage:
+                        print(f"retry {i+1} {pageUrl}")
+                        continue
+                    return otherPage["data"]
+
+            dataArr.extend(_())
     return dataArr[0:maxNum]
+
+
+def convert_time(t):
+    _ = datetime.datetime.fromtimestamp(int(t))
+    return _.strftime("%Y-%m-%d")
 
 
 def get_page_one(url):
     """
     get one page video
+    jiuse.io和jiuse.ai, 这两个域名是另一套解析方式,而且时间不对, 所以不用
+    建议用91porny.com这个域名,时间也是对的
     """
     filterArr = ["«", "»", "上一页", "下一页", "..."]  # 页面页码按钮过滤
     response = requests.get(url, headers=headers, proxies=proxies, timeout=timeout)
     if response.status_code == 200:
         text = response.text
         soup = BeautifulSoup(text, "html.parser")
-        videoElArr = soup.select(".colVideoList .video-elem")
 
-        pageLinkArr = [
-            i.text for i in soup.select(".page-link") if i.text not in filterArr
-        ]
+        if url.split("/")[2] in ["jiuse.io", "jiuse.ai"]:
+            s1 = ".column .card"
+            s2 = ".pagination-link"
+            s3 = ".content h4 a"
+            s4 = ".has-text-grey a.has-text-grey-dark"
+            f5 = lambda el: convert_time(el.select_one("time")["datetime"])
+        else:
+            s1 = ".colVideoList .video-elem"
+            s2 = ".page-link"
+            s3 = ".title"
+            s4 = "a.text-dark"
+            f5 = (
+                lambda el: el.select("div.text-muted")[1]
+                .text.replace("\xa0", "")
+                .strip("")
+                .split("|")[0]
+                .strip("")
+            )
+
+        videoElArr = soup.select(s1)
+        pageLinkArr = [i.text for i in soup.select(s2) if i.text not in filterArr]
         pageCount = int(pageLinkArr[-1]) if pageLinkArr else 1
+
+        assert len(videoElArr) > 0, f"videoElArr: {len(videoElArr)}"
+        assert len(pageLinkArr) > 0, f"pageLinkArr: {len(pageLinkArr)}"
+
         data = [
             {
-                "videoId": el.select_one(".title")["href"].strip().split("/")[-1],
-                "title": el.select_one(".title").text.strip(),
-                "url": el.select_one(".title")["href"].strip(),
-                "author": el.select_one("a.text-dark").text.strip(),
+                "videoId": el.select_one(s3)["href"].strip().split("/")[-1],
+                "title": el.select_one(s3).text.strip(),
+                "url": el.select_one(s3)["href"].strip(),
+                "author": el.select_one(s4).text.strip(),
+                "calendar": f5(el),
             }
             for el in videoElArr
         ]
@@ -164,6 +211,56 @@ def get_cache_dir(path, cacheDir="cache_files"):
     return config["outPath"] / Path(cacheDir) / path.parent.name / path.stem
 
 
+def new_check_skip(filePath, info, lastTitle=""):
+    NewFilePath = get_new_file_path(filePath, info)
+
+    filePath, isSkip = is_file(filePath)
+    NewFilePath, NewIsSkip = is_file(NewFilePath)
+
+    if isSkip and not NewIsSkip:
+        print(f"change name {NewFilePath}")
+        filePath.rename(NewFilePath)
+        return [False, NewFilePath]
+
+    if isSkip:
+        print(
+            "skip video title1:",
+            info.get("author", ""),
+            info.get("videoTitle", ""),
+            info.get("title", ""),
+            url,
+            info.get("m3u8_url", ""),
+        )
+        # print("标题一致?", info["videoTitle"] == lastTitle)
+        return [False, filePath]
+
+    if NewIsSkip:
+        print(
+            "skip video title2:",
+            info.get("author", ""),
+            info.get("videoTitle", ""),
+            info.get("title", ""),
+            url,
+            info.get("m3u8_url", ""),
+        )
+        # print("标题一致?", info["videoTitle"] == lastTitle)
+        return [False, NewFilePath]
+
+    [filePathGlob, isSkipGlob] = check_skip_glob(info, filePath)
+    if isSkipGlob:
+        print(
+            "skip video id:",
+            info.get("author", ""),
+            info.get("videoTitle", ""),
+            info.get("title", ""),
+            url,
+            info.get("m3u8_url", ""),
+        )
+        # print("标题一致?", info["videoTitle"] == lastTitle)
+        return [False, filePathGlob]
+    return [True, NewFilePath]
+
+
 def download_video(url, lastTitle=""):
     """
     download video
@@ -178,57 +275,17 @@ def download_video(url, lastTitle=""):
         info["author"], info["videoTitle"], info["videoId"]
     )  # 一定要用videoTitle,别用page里的title,因为会添加前缀后缀
 
-    NewFilePath = get_new_file_path(filePath, info)
-    filePath, isSkip = is_file(filePath)
-    NewFilePath, NewIsSkip = is_file(NewFilePath)
-
-    if isSkip and not NewIsSkip:
-        print(f"change name {NewFilePath}")
-        filePath.rename(NewFilePath)
-        return NewFilePath
-
-    if isSkip:
-        print(
-            "skip video title1:",
-            info["author"],
-            info["videoTitle"],
-            url,
-            info["m3u8_url"],
-        )
-        print("标题一致?", info["videoTitle"] == lastTitle)
-        return filePath
-
-    if NewIsSkip:
-        print(
-            "skip video title2:",
-            info["author"],
-            info["videoTitle"],
-            url,
-            info["m3u8_url"],
-        )
-        print("标题一致?", info["videoTitle"] == lastTitle)
-        return NewFilePath
-
-    [filePathGlob, isSkipGlob] = check_skip_glob(info, filePath)
-    if isSkipGlob:
-        print(
-            "skip video id:",
-            info["author"],
-            info["videoTitle"],
-            url,
-            info["m3u8_url"],
-        )
-        print("标题一致?", info["videoTitle"] == lastTitle)
-        return filePathGlob
-
+    [flag, resPath] = new_check_skip(filePath, info, lastTitle)
+    if not flag:
+        return resPath
     # ffmpeg_download_m3u8(info["m3u8_url"], filePath)  #用ffmpeg直接下载
     m3u8_download(
         info["m3u8_url"],
-        get_cache_dir(NewFilePath),
-        NewFilePath,
+        get_cache_dir(resPath),
+        resPath,
     )  # 多线程下载,再用ffmpeg合并
 
-    return NewFilePath
+    return resPath
 
 
 def download_video_create_playlist(url, lastTitle=""):
@@ -385,7 +442,7 @@ def download_user(url, maxNum, category=""):
     """
     download all user videos
     """
-    url = url.split("?")[0]
+    url = replace_url(url)
     pageInfoArrOrigin = get_page(url, maxNum)
     [pageInfoArr, blacklistArr] = blacklist_filter(pageInfoArrOrigin)
     print(
@@ -396,6 +453,8 @@ def download_user(url, maxNum, category=""):
         "count videos:",
         len(pageInfoArrOrigin),
     )
+    assert len(pageInfoArr) > 0, "check pageInfoArr length 0"
+
     filePathArr = []
     for idx, info in enumerate(
         pageInfoArr
@@ -412,17 +471,26 @@ def download_user(url, maxNum, category=""):
         titleArr = (
             cleanTitleArr(info["title"]) if category else [info["title"].strip()]
         )  # 过滤一下标题
-        [filePath, isSkip] = check_skip(info, titleArr)
-        if isSkip:
-            print("check page title - 已存在,跳过:", filePath, videoUrl)
-            filePathArr.append(filePath)
+
+        # [filePath, isSkip] = check_skip(info, titleArr)
+
+        def _():
+            for title in titleArr:
+                filePath = get_file_path(info["author"], title, info["videoId"])
+                [flag, resPath] = new_check_skip(filePath, info, title)
+                if not flag:
+                    return [False, resPath]
+            return [True, resPath]
+
+        [flag, resPath] = _()
+        if not flag:
+            print("check list title - 已存在,跳过:", resPath, videoUrl)
+            filePathArr.append(resPath)
             continue
 
-        [filePathGlob, isSkipGlob] = check_skip_glob(info, filePath)
-        if isSkipGlob:
-            print("check page id - 已存在,跳过:", filePath, videoUrl)
-            filePathArr.append(filePathGlob)
-            continue
+        # import pdb
+
+        # pdb.set_trace()
 
         filePath = download_video(videoUrl, info["title"])
         filePathArr.append(filePath)
@@ -482,6 +550,7 @@ def mix_download(url, maxNum=24 * 2, outPath="./"):
     configPath = Path(outPath) / "config.json"
     config = getConfig(configPath, outPath=outPath)
 
+    url = replace_url(url)
     urlObj = urlparse(url)
     seg = urlObj.path.split("/")
     if seg[2] == "category":
