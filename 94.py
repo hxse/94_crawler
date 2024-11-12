@@ -216,10 +216,16 @@ def new_check_skip(filePath, info, lastTitle=""):
 
     filePath, isSkip = is_file(filePath)
     NewFilePath, NewIsSkip = is_file(NewFilePath)
+    filePathGlob, isSkipGlob = check_skip_glob(info, filePath)
 
     if isSkip and not NewIsSkip:
         print(f"change name {NewFilePath}")
         filePath.rename(NewFilePath)
+        return [False, NewFilePath]
+
+    if not isSkip and isSkipGlob:
+        print(f"change name {NewFilePath}")
+        filePathGlob.rename(NewFilePath)
         return [False, NewFilePath]
 
     if isSkip:
@@ -246,7 +252,6 @@ def new_check_skip(filePath, info, lastTitle=""):
         # print("标题一致?", info["videoTitle"] == lastTitle)
         return [False, NewFilePath]
 
-    [filePathGlob, isSkipGlob] = check_skip_glob(info, filePath)
     if isSkipGlob:
         print(
             "skip video id:",
@@ -258,6 +263,7 @@ def new_check_skip(filePath, info, lastTitle=""):
         )
         # print("标题一致?", info["videoTitle"] == lastTitle)
         return [False, filePathGlob]
+
     return [True, NewFilePath]
 
 
