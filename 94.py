@@ -180,7 +180,7 @@ def get_page_one(url):
         pageCount = int(pageLinkArr[-1]) if pageLinkArr else 1
 
         assert len(videoElArr) > 0, f"videoElArr: {len(videoElArr)}"
-        assert len(pageLinkArr) > 0, f"pageLinkArr: {len(pageLinkArr)}"
+        # assert len(pageLinkArr) > 0, f"pageLinkArr: {len(pageLinkArr)}"
 
         data = [
             {
