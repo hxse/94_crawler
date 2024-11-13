@@ -569,6 +569,13 @@ def mix_download(url, maxNum=24 * 2, outPath="./"):
         print("网页路径不匹配", url)
 
 
+def loop_dir(path, outPath="./"):
+    for i in Path(path).glob("*.mp4"):
+        mix_download(
+            f"https://91porny.com/video/view/{i.stem.split('_')[-1]}", outPath=outPath
+        )
+
+
 if __name__ == "__main__":
     url = "https://jiuse88.com/video/view/390a6b91aa44932a0196"
     fire.Fire(
@@ -582,5 +589,6 @@ if __name__ == "__main__":
             "gpo": get_page_one,
             "fdm": ffmpeg_download_m3u8,
             "mdl": m3u8_download,
+            "dir": loop_dir,
         }
     )
