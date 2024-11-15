@@ -379,7 +379,7 @@ def create_playlist(paths, category):
         f.writelines(data)
 
 
-def sort_playlist(config, category, category_sort):
+def sort_playlist(config, category="user_playlist", category_sort="user_playlist_sort"):
     c_path = config["outPath"] / f"{category}"
     c_path_sort = config["outPath"] / f"{category_sort}"
     c_path_sort.mkdir(exist_ok=True)
@@ -540,7 +540,7 @@ def download_user(url, maxNum, category=""):
     if category == "":
         category = "user_playlist/" + info["author"]
     create_playlist(filePathArr, category)
-    sort_playlist(config, "user_playlist", "user_playlist_sort")
+    sort_playlist(config)
 
 
 def download_category(url, maxNum):
