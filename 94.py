@@ -8,6 +8,7 @@ import fire
 from time import sleep
 import datetime
 from pathlib import Path
+import shutil
 import re
 import json
 from m3u8_multithreading_download import (
@@ -374,7 +375,29 @@ def create_playlist(paths, category):
             if i
         ]
         data = deduplication(data)
+        data = sorted(data, key=lambda x: Path(x).stem)
         f.writelines(data)
+
+
+def sort_playlist(config, category, category_sort):
+    c_path = config["outPath"] / f"{category}"
+    c_path_sort = config["outPath"] / f"{category_sort}"
+    c_path_sort.mkdir(exist_ok=True)
+    user_list = config["user_list"]
+
+    for i in c_path_sort.glob("*"):
+        if i.is_file():
+            i.unlink()
+
+    data = [i for i in c_path.glob("*.m3u8")]
+    for i in data:
+        if i.stem in user_list:
+            idx = str(user_list.index(i.stem) + 1).zfill(len(str(len(data))))
+            i2 = c_path_sort / f"{idx} {i.name}"
+            shutil.copy(str(i), str(i2))
+        else:
+            i2 = c_path_sort / i.name
+            shutil.copy(str(i), str(i2))
 
 
 def cleanBlank(title):
@@ -445,13 +468,23 @@ def blacklist_filter(pageInfoArrOrigin):
     return [pageInfoArr, blacklistArr]
 
 
+def filter(pageInfoArr):
+    _arr = []
+    author = pageInfoArr[0]["author"]
+    for i in pageInfoArr:
+        if i["author"] == author:
+            _arr.append(i)
+    return _arr
+
+
 def download_user(url, maxNum, category=""):
     """
     download all user videos
     """
     url = replace_url(url)
     pageInfoArrOrigin = get_page(url, maxNum)
-    [pageInfoArr, blacklistArr] = blacklist_filter(pageInfoArrOrigin)
+    [_pageInfoArr, blacklistArr] = blacklist_filter(pageInfoArrOrigin)
+    pageInfoArr = filter(_pageInfoArr)
     print(
         "start videos:",
         len(pageInfoArr),
@@ -459,6 +492,8 @@ def download_user(url, maxNum, category=""):
         len(blacklistArr),
         "count videos:",
         len(pageInfoArrOrigin),
+        "filter:",
+        len(_pageInfoArr) - len(pageInfoArr),
     )
     assert len(pageInfoArr) > 0, "check pageInfoArr length 0"
 
@@ -495,10 +530,6 @@ def download_user(url, maxNum, category=""):
             filePathArr.append(resPath)
             continue
 
-        # import pdb
-
-        # pdb.set_trace()
-
         filePath = download_video(videoUrl, info["title"])
         filePathArr.append(filePath)
         print(
@@ -509,6 +540,7 @@ def download_user(url, maxNum, category=""):
     if category == "":
         category = "user_playlist/" + info["author"]
     create_playlist(filePathArr, category)
+    sort_playlist(config, "user_playlist", "user_playlist_sort")
 
 
 def download_category(url, maxNum):
