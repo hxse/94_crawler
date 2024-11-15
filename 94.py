@@ -312,7 +312,7 @@ def add_playlist(data, paths):
     return [*data, *paths]
 
 
-def sort_playlist(data, paths, mode=1):
+def merge_playlist(data, paths, mode=1):
     if mode == 1:
         for p in paths:
             p = Path(p).as_posix() + "\n"
@@ -349,6 +349,7 @@ def create_playlist(paths, category):
     if "/" in category:
         (config["outPath"] / category.split("/")[0]).mkdir(exist_ok=True)
     filePath = config["outPath"] / f"{category}.m3u8"
+
     data = []
     if filePath.is_file():
         with open(filePath, "r", encoding="utf8") as f:
@@ -357,20 +358,20 @@ def create_playlist(paths, category):
     if len(data) > 0:
         data = data[1:] if data[0] == m3u8Title else data
     data = [i.strip() for i in data]
-    data = deduplication(data)
     paths = [
         (Path("/".join(i.parts[-3:])).as_posix()).strip() for i in paths if i != ""
     ]
-    paths = deduplication(paths)  # 要是重复的话,sort会追加到第一个的后面去
-    data = sort_playlist(data, paths)
-    data = deduplication(data)
+    data = merge_playlist(data, paths, mode=1)
     data = [i + "\n" for i in data]
     with open(filePath, "w", encoding="utf8") as f:
         f.write(m3u8Title)
         prefix = "/".join([".." for i in range(len(category.split("/")) - 1)])
         data = [
-            i if prefix == "" or i.startswith(prefix) else prefix + "/" + i
+            i.strip() + "\n"
+            if prefix == "" or i.startswith(prefix)
+            else (prefix + "/" + i).strip() + "\n"
             for i in data
+            if i
         ]
         data = deduplication(data)
         f.writelines(data)
