@@ -9,6 +9,7 @@ from time import sleep
 import datetime
 from pathlib import Path
 import shutil
+import urllib
 import re
 import json
 from m3u8_multithreading_download import (
@@ -468,9 +469,9 @@ def blacklist_filter(pageInfoArrOrigin):
     return [pageInfoArr, blacklistArr]
 
 
-def filter(pageInfoArr):
+def filter(url, pageInfoArr):
+    author = urllib.parse.unquote(url.split("/")[4])
     _arr = []
-    author = pageInfoArr[0]["author"]
     for i in pageInfoArr:
         if i["author"] == author:
             _arr.append(i)
@@ -484,7 +485,7 @@ def download_user(url, maxNum, category=""):
     url = replace_url(url)
     pageInfoArrOrigin = get_page(url, maxNum)
     [_pageInfoArr, blacklistArr] = blacklist_filter(pageInfoArrOrigin)
-    pageInfoArr = filter(_pageInfoArr)
+    pageInfoArr = filter(url, _pageInfoArr)
     print(
         "start videos:",
         len(pageInfoArr),
