@@ -200,6 +200,9 @@ def get_page_one(url):
 def get_file_path(author, title, vid, dataDir="data_files"):
     title = title.rstrip(".")  # windows会把末尾的.清空
     fileName = validateName(f"{title}_{vid}.mp4", "")  # 把文件名净化成windows安全的字符
+    fileName = fileName.replace("[", "［").replace(
+        "]", "］"
+    )  # 有些播放器比如oplayer不认半角[], 所以换成全角的
     filePath = Path(dataDir) / author / fileName
     return config["outPath"] / filePath
 
